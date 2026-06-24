@@ -1,10 +1,16 @@
 cmake_minimum_required(VERSION 3.21)
 
+if(POLICY CMP0091)
+    cmake_policy(SET CMP0091 NEW)
+endif()
+
 project(UsbBuilder VERSION 0.1.0 LANGUAGES CXX)
 
 if(NOT WIN32)
     message(FATAL_ERROR "UsbBuilder is a Windows 10/11 desktop utility and must be built on Windows.")
 endif()
+
+option(USB_BUILDER_DEPLOY_QT "Deploy Qt DLLs with windeployqt after build" ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
 
@@ -48,29 +54,35 @@ if(MSVC)
     target_link_options(UsbBuilder PRIVATE
         "/MANIFESTUAC:level='requireAdministrator' uiAccess='false'"
     )
+
+    set_property(TARGET UsbBuilder PROPERTY
+        MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
+    )
 endif()
 
-get_target_property(QT_QMAKE_EXECUTABLE Qt6::qmake IMPORTED_LOCATION)
-get_filename_component(QT_BIN_DIR "${QT_QMAKE_EXECUTABLE}" DIRECTORY)
+if(USB_BUILDER_DEPLOY_QT)
+    get_target_property(QT_QMAKE_EXECUTABLE Qt6::qmake IMPORTED_LOCATION)
+    get_filename_component(QT_BIN_DIR "${QT_QMAKE_EXECUTABLE}" DIRECTORY)
 
-find_program(WINDEPLOYQT_EXECUTABLE
-    NAMES windeployqt
-    HINTS "${QT_BIN_DIR}"
-)
+    find_program(WINDEPLOYQT_EXECUTABLE
+        NAMES windeployqt
+        HINTS "${QT_BIN_DIR}"
+    )
 
-if(NOT WINDEPLOYQT_EXECUTABLE)
-    message(FATAL_ERROR "windeployqt was not found. Check CMAKE_PREFIX_PATH and Qt installation.")
+    if(NOT WINDEPLOYQT_EXECUTABLE)
+        message(FATAL_ERROR "windeployqt was not found. Check CMAKE_PREFIX_PATH and Qt installation.")
+    endif()
+
+    add_custom_command(TARGET UsbBuilder POST_BUILD
+        COMMAND "${WINDEPLOYQT_EXECUTABLE}"
+            $<IF:$<CONFIG:Debug>,--debug,--release>
+            --compiler-runtime
+            --no-translations
+            "$<TARGET_FILE:UsbBuilder>"
+        COMMENT "Deploying Qt runtime"
+        VERBATIM
+    )
 endif()
-
-add_custom_command(TARGET UsbBuilder POST_BUILD
-    COMMAND "${WINDEPLOYQT_EXECUTABLE}"
-        $<IF:$<CONFIG:Debug>,--debug,--release>
-        --compiler-runtime
-        --no-translations
-        "$<TARGET_FILE:UsbBuilder>"
-    COMMENT "Deploying Qt runtime"
-    VERBATIM
-)
 
 if(MSVC)
     set(CMAKE_INSTALL_UCRT_LIBRARIES TRUE)
