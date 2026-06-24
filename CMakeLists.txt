@@ -11,7 +11,6 @@ find_package(Qt6 REQUIRED COMPONENTS Widgets)
 qt_standard_project_setup()
 
 qt_add_executable(UsbBuilder WIN32
-    resources/UsbBuilder.rc
     src/BuildWorker.cpp
     src/BuildWorker.h
     src/DiskFormatter.cpp
@@ -40,14 +39,16 @@ target_compile_definitions(UsbBuilder PRIVATE
     NOMINMAX
 )
 
-target_include_directories(UsbBuilder PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/resources
-)
-
 target_link_libraries(UsbBuilder PRIVATE
     Qt6::Widgets
     Advapi32
 )
+
+if(MSVC)
+    target_link_options(UsbBuilder PRIVATE
+        "/MANIFESTUAC:level='requireAdministrator' uiAccess='false'"
+    )
+endif()
 
 get_target_property(QT_QMAKE_EXECUTABLE Qt6::qmake IMPORTED_LOCATION)
 get_filename_component(QT_BIN_DIR "${QT_QMAKE_EXECUTABLE}" DIRECTORY)
